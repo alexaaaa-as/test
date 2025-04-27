@@ -11,7 +11,8 @@ import type { Product } from '../../../types';
 import { formatCurrency, formatDate, isExpiringSoon, isExpired } from '../../../utils/helpers';
 import { generateId, generateBarcode } from '../../../utils/helpers';
 import { QRCodeSVG } from 'qrcode.react';
-
+import Image from 'next/image';
+import Barcode from 'react-barcode';
 const { confirm } = Modal;
 const { Search } = Input;
 
@@ -103,8 +104,8 @@ export default function ProductsPage() {
   useEffect(() => {
     if (searchText) {
       const filtered = products.filter(
-        product => 
-          product.name.includes(searchText) || 
+        product =>
+          product.name.includes(searchText) ||
           product.category?.includes(searchText) ||
           product.lotNumber.includes(searchText)
       );
@@ -226,25 +227,25 @@ export default function ProductsPage() {
       render: (_: any, record: Product) => (
         <Space size="middle">
           <Tooltip title="تعديل">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => showModal(record)} 
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => showModal(record)}
             />
           </Tooltip>
           <Tooltip title="طباعة الباركود">
-            <Button 
-              type="text" 
-              icon={<BarcodeOutlined />} 
-              onClick={() => showBarcodeModal(record)} 
+            <Button
+              type="text"
+              icon={<BarcodeOutlined />}
+              onClick={() => showBarcodeModal(record)}
             />
           </Tooltip>
           <Tooltip title="حذف">
-            <Button 
-              type="text" 
-              danger 
-              icon={<DeleteOutlined />} 
-              onClick={() => showDeleteConfirm(record)} 
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => showDeleteConfirm(record)}
             />
           </Tooltip>
         </Space>
@@ -254,7 +255,7 @@ export default function ProductsPage() {
 
   const printBarcode = () => {
     if (!selectedProduct) return;
-    
+
     const printWindow = window.open('', '', 'height=500,width=500');
     if (printWindow) {
       printWindow.document.write(`
@@ -288,7 +289,7 @@ export default function ProductsPage() {
           </body>
         </html>
       `);
-      
+
       printWindow.document.close();
       setTimeout(() => {
         printWindow.print();
@@ -311,7 +312,7 @@ export default function ProductsPage() {
           </Button>
         }
       />
-      
+
       <div style={{ marginBottom: 16 }}>
         <Search
           placeholder="ابحث عن منتج..."
@@ -322,7 +323,7 @@ export default function ProductsPage() {
           style={{ maxWidth: 400 }}
         />
       </div>
-      
+
       <Table
         columns={columns}
         dataSource={filteredProducts}
@@ -355,7 +356,15 @@ export default function ProductsPage() {
           <div style={{ textAlign: 'center' }}>
             <h3>{selectedProduct.name}</h3>
             <p>رقم اللوط: {selectedProduct.lotNumber}</p>
-            <QRCodeSVG value={selectedProduct.barcode} size={200} />
+
+            {/* استخدام مكتبة react-barcode لعرض صورة الباركود */}
+            <Barcode
+              value={selectedProduct.barcode}
+              width={2} // عرض الشريط
+              height={100} // ارتفاع الشريط
+              displayValue={false} // عدم عرض قيمة الباركود أسفل الشريط
+            />
+
             <p style={{ marginTop: 16 }}>{selectedProduct.barcode}</p>
           </div>
         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Table, Button, Avatar, Space, Tag, Card, Tabs, Modal, Form, Input, Upload, message } from 'antd';
 import { 
   UserAddOutlined, 
@@ -19,6 +20,41 @@ import RoutePlanner from '../../../components/common/RoutePlanner';
 import { useStore } from '../../../lib/store';
 import type { Representative, VisitStop } from '../../../types';
 import { formatDate, generateId } from '../../../utils/helpers';
+
+// Client-side only chart registration
+const registerCharts = () => {
+  if (typeof window !== 'undefined') {
+    import('chart.js').then((ChartModule) => {
+      const {
+        Chart,
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        BarElement,
+        Tooltip,
+        Legend,
+        ArcElement,
+      } = ChartModule;
+
+      Chart.register(
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        BarElement,
+        Tooltip,
+        Legend,
+        ArcElement
+      );
+    });
+  }
+};
+
+// Dynamically import chart components with SSR disabled
+const Line = dynamic(() => import('react-chartjs-2').then(mod => mod.Line), { ssr: false });
+const Bar = dynamic(() => import('react-chartjs-2').then(mod => mod.Bar), { ssr: false });
+const Pie = dynamic(() => import('react-chartjs-2').then(mod => mod.Pie), { ssr: false });
 
 export default function RepresentativesPage() {
   const { 
@@ -78,6 +114,11 @@ export default function RepresentativesPage() {
       setRepresentatives(mockRepresentatives);
     }
   }, [representatives.length, setRepresentatives]);
+
+  // Register Chart.js on client side
+  useEffect(() => {
+    registerCharts();
+  }, []);
 
   const showModal = (representative?: Representative) => {
     setEditingRepresentative(representative || null);

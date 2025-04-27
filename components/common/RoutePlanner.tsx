@@ -2,14 +2,51 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, List, Avatar, Button, Typography, Tag, Space, Row, Col, Select, message, Progress } from 'antd';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import dynamic from 'next/dynamic';
 import { UserOutlined, EnvironmentOutlined, SwapOutlined, CalculatorOutlined } from '@ant-design/icons';
 import { Customer, Representative, VisitStop } from '../../types';
-import RouteMap from './RouteMap';
 import { generateId } from '../../utils/helpers';
+import type { DropResult } from 'react-beautiful-dnd';
 
 const { Text, Title } = Typography;
 const { Option } = Select;
+
+// Dynamically import react-beautiful-dnd components with SSR disabled
+const DragDropContext = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.DragDropContext),
+  { ssr: false }
+);
+
+const Droppable = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.Droppable),
+  { ssr: false }
+);
+
+const Draggable = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.Draggable),
+  { ssr: false }
+);
+
+// Dynamically import RouteMap with SSR disabled
+const RouteMap = dynamic(
+  () => import('./RouteMap'),
+  { ssr: false }
+);
+
+// Client-side only wrapper component
+const ClientSideOnly = ({ children }: { children: React.ReactNode }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  if (!isMounted) {
+    return <div>Loading route planner...</div>;
+  }
+  
+  return <>{children}</>;
+};
 
 interface RoutePlannerProps {
   customers: Customer[];
@@ -207,193 +244,195 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   };
 
   return (
-    <div>
-      <Row gutter={16}>
-        <Col span={24} md={8}>
-          <Card title="إعدادات المسار" variant="outlined">
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8 }}>اختر المندوب:</label>
-              <Select
-                style={{ width: '100%' }}
-                value={selectedRepId}
-                onChange={setSelectedRepId}
-                placeholder="اختر المندوب"
-              >
-                {representatives.map(rep => (
-                  <Option key={rep.id} value={rep.id}>
-                    <Space>
-                      <Avatar size="small" src={rep.photoUrl} icon={<UserOutlined />} />
-                      {rep.name}
-                    </Space>
-                  </Option>
-                ))}
-              </Select>
-            </div>
-            
-            <div style={{ marginBottom: 16 }}>
-              <Button 
-                type="primary" 
-                icon={<CalculatorOutlined />} 
-                onClick={optimizeRoute}
-                disabled={!selectedRepId || availableCustomers.length === 0 || optimizing}
-                loading={optimizing}
-                block
-              >
-                تحسين المسار تلقائيًا
-              </Button>
+    <ClientSideOnly>
+      <div>
+        <Row gutter={16}>
+          <Col span={24} md={8}>
+            <Card title="إعدادات المسار" variant="outlined">
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8 }}>اختر المندوب:</label>
+                <Select
+                  style={{ width: '100%' }}
+                  value={selectedRepId}
+                  onChange={setSelectedRepId}
+                  placeholder="اختر المندوب"
+                >
+                  {representatives.map(rep => (
+                    <Option key={rep.id} value={rep.id}>
+                      <Space>
+                        <Avatar size="small" src={rep.photoUrl} icon={<UserOutlined />} />
+                        {rep.name}
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+              </div>
               
-              {optimizing && (
-                <Progress percent={Math.floor(Math.random() * 100)} status="active" />
-              )}
-            </div>
+              <div style={{ marginBottom: 16 }}>
+                <Button 
+                  type="primary" 
+                  icon={<CalculatorOutlined />} 
+                  onClick={optimizeRoute}
+                  disabled={!selectedRepId || availableCustomers.length === 0 || optimizing}
+                  loading={optimizing}
+                  block
+                >
+                  تحسين المسار تلقائيًا
+                </Button>
+                
+                {optimizing && (
+                  <Progress percent={Math.floor(Math.random() * 100)} status="active" />
+                )}
+              </div>
+              
+              <div style={{ marginTop: 16 }}>
+                <Button 
+                  type="default" 
+                  onClick={handleSaveRoute}
+                  disabled={!selectedRepId || routeCustomers.length === 0}
+                  block
+                >
+                  حفظ المسار
+                </Button>
+              </div>
+            </Card>
             
-            <div style={{ marginTop: 16 }}>
-              <Button 
-                type="default" 
-                onClick={handleSaveRoute}
-                disabled={!selectedRepId || routeCustomers.length === 0}
-                block
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Card 
+                title={`مسار الزيارات (${routeCustomers.length})`} 
+                style={{ marginTop: 16 }}
+                extra={
+                  <Tag color="blue">
+                    يمكنك سحب وإفلات العملاء لترتيب المسار
+                  </Tag>
+                }
               >
-                حفظ المسار
-              </Button>
-            </div>
-          </Card>
+                <Droppable droppableId="routeList">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      style={{ minHeight: 200 }}
+                    >
+                      {routeCustomers.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
+                          لا يوجد عملاء في المسار
+                        </div>
+                      ) : (
+                        <List
+                          dataSource={routeCustomers}
+                          renderItem={(customer, index) => (
+                            <Draggable 
+                              key={customer.id} 
+                              draggableId={customer.id} 
+                              index={index}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                >
+                                  <List.Item style={{ padding: '8px 0' }}>
+                                    <List.Item.Meta
+                                      avatar={
+                                        <div style={{ textAlign: 'center', width: 24 }}>
+                                          <Tag color="orange">{customer.order}</Tag>
+                                        </div>
+                                      }
+                                      title={customer.name}
+                                      description={
+                                        <Text type="secondary" ellipsis>
+                                          {customer.address}
+                                        </Text>
+                                      }
+                                    />
+                                  </List.Item>
+                                </div>
+                              )}
+                            </Draggable>
+                          )}
+                        />
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </Card>
+              
+              <Card 
+                title={`العملاء المتاحين (${availableCustomers.length})`}
+                variant="outlined"
+                style={{ marginTop: 16 }}
+              >
+                <Droppable droppableId="availableList">
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      style={{ minHeight: 200 }}
+                    >
+                      {availableCustomers.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
+                          لا يوجد عملاء متاحين
+                        </div>
+                      ) : (
+                        <List
+                          dataSource={availableCustomers}
+                          renderItem={(customer, index) => (
+                            <Draggable 
+                              key={customer.id} 
+                              draggableId={`available-${customer.id}`} 
+                              index={index}
+                            >
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                >
+                                  <List.Item style={{ padding: '8px 0' }}>
+                                    <List.Item.Meta
+                                      avatar={<Avatar icon={<UserOutlined />} />}
+                                      title={customer.name}
+                                      description={
+                                        <Text type="secondary" ellipsis>
+                                          {customer.address}
+                                        </Text>
+                                      }
+                                    />
+                                  </List.Item>
+                                </div>
+                              )}
+                            </Draggable>
+                          )}
+                        />
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </Card>
+            </DragDropContext>
+          </Col>
           
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Card 
-              title={`مسار الزيارات (${routeCustomers.length})`} 
-              style={{ marginTop: 16 }}
-              extra={
-                <Tag color="blue">
-                  يمكنك سحب وإفلات العملاء لترتيب المسار
-                </Tag>
-              }
-            >
-              <Droppable droppableId="routeList">
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    style={{ minHeight: 200 }}
-                  >
-                    {routeCustomers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
-                        لا يوجد عملاء في المسار
-                      </div>
-                    ) : (
-                      <List
-                        dataSource={routeCustomers}
-                        renderItem={(customer, index) => (
-                          <Draggable 
-                            key={customer.id} 
-                            draggableId={customer.id} 
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                              >
-                                <List.Item style={{ padding: '8px 0' }}>
-                                  <List.Item.Meta
-                                    avatar={
-                                      <div style={{ textAlign: 'center', width: 24 }}>
-                                        <Tag color="orange">{customer.order}</Tag>
-                                      </div>
-                                    }
-                                    title={customer.name}
-                                    description={
-                                      <Text type="secondary" ellipsis>
-                                        {customer.address}
-                                      </Text>
-                                    }
-                                  />
-                                </List.Item>
-                              </div>
-                            )}
-                          </Draggable>
-                        )}
-                      />
-                    )}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
+          <Col span={24} md={16}>
+            <Card title="خريطة المسار" variant="outlined">
+              <RouteMap
+                representatives={selectedRepId ? 
+                  representatives.filter(r => r.id === selectedRepId) : 
+                  representatives
+                }
+                customers={customers}
+                selectedRepresentative={selectedRepresentative}
+                visitRoute={routeCustomers.map(c => ({ customerId: c.id, order: c.order }))}
+              />
             </Card>
-            
-            <Card 
-              title={`العملاء المتاحين (${availableCustomers.length})`}
-              variant="outlined"
-              style={{ marginTop: 16 }}
-            >
-              <Droppable droppableId="availableList">
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    style={{ minHeight: 200 }}
-                  >
-                    {availableCustomers.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
-                        لا يوجد عملاء متاحين
-                      </div>
-                    ) : (
-                      <List
-                        dataSource={availableCustomers}
-                        renderItem={(customer, index) => (
-                          <Draggable 
-                            key={customer.id} 
-                            draggableId={`available-${customer.id}`} 
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                              >
-                                <List.Item style={{ padding: '8px 0' }}>
-                                  <List.Item.Meta
-                                    avatar={<Avatar icon={<UserOutlined />} />}
-                                    title={customer.name}
-                                    description={
-                                      <Text type="secondary" ellipsis>
-                                        {customer.address}
-                                      </Text>
-                                    }
-                                  />
-                                </List.Item>
-                              </div>
-                            )}
-                          </Draggable>
-                        )}
-                      />
-                    )}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </Card>
-          </DragDropContext>
-        </Col>
-        
-        <Col span={24} md={16}>
-          <Card title="خريطة المسار" variant="outlined">
-            <RouteMap
-              representatives={selectedRepId ? 
-                representatives.filter(r => r.id === selectedRepId) : 
-                representatives
-              }
-              customers={customers}
-              selectedRepresentative={selectedRepresentative}
-              visitRoute={routeCustomers.map(c => ({ customerId: c.id, order: c.order }))}
-            />
-          </Card>
-        </Col>
-      </Row>
-    </div>
+          </Col>
+        </Row>
+      </div>
+    </ClientSideOnly>
   );
 };
 
-export default RoutePlanner; 
+export default dynamic(() => Promise.resolve(RoutePlanner), { ssr: false }); 

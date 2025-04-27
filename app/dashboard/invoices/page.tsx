@@ -89,9 +89,11 @@ export default function InvoicesPage() {
             },
           ],
           status: 'COMPLETED',
-          totalAmount: 0, // will be calculated
-          paidAmount: 0, // will be calculated
-          notes: 'تم التسليم للعميل مباشرة',
+          totalAmount: 5 * products[0].sellingPrice + 3 * products[1].sellingPrice,
+          paidAmount: 5 * products[0].sellingPrice + 3 * products[1].sellingPrice,
+          notes: 'توريد منتجات زراعية',
+          total: 5 * products[0].sellingPrice + 3 * products[1].sellingPrice,
+          paid: true
         },
         {
           id: generateId(),
@@ -109,8 +111,11 @@ export default function InvoicesPage() {
             },
           ],
           status: 'COMPLETED',
-          totalAmount: 0, // will be calculated
-          paidAmount: 0, // will be calculated
+          totalAmount: 10 * products[2].sellingPrice,
+          paidAmount: 10 * products[2].sellingPrice,
+          total: 10 * products[2].sellingPrice,
+          paid: true,
+          notes: 'توريد منتجات زراعية',
         },
       ];
 
@@ -198,6 +203,8 @@ export default function InvoicesPage() {
         totalAmount: invoiceItems.reduce((sum, item) => sum + item.total, 0),
         paidAmount: values.paidAmount || invoiceItems.reduce((sum, item) => sum + item.total, 0),
         notes: values.notes,
+        total: invoiceItems.reduce((sum, item) => sum + item.total, 0),
+        paid: values.paidAmount === invoiceItems.reduce((sum, item) => sum + item.total, 0)
       };
       
       addInvoice(newInvoice);

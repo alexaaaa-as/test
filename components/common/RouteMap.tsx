@@ -39,8 +39,11 @@ const Polyline = dynamic(
 // Component to adjust the map view
 const MapUpdater = dynamic(
   () => {
-    const MapUpdaterComponent = ({ center }: { center: [number, number] }) => {
-      const useMap = require('react-leaflet').useMap;
+    return Promise.resolve(({ center }: { center: [number, number] }) => {
+      // This is a client-side only component
+      if (typeof window === 'undefined') return null;
+      
+      const { useMap } = require('react-leaflet');
       const map = useMap();
       
       useEffect(() => {
@@ -50,8 +53,7 @@ const MapUpdater = dynamic(
       }, [center, map]);
       
       return null;
-    };
-    return Promise.resolve(MapUpdaterComponent);
+    });
   },
   { ssr: false }
 );
@@ -63,6 +65,21 @@ interface RouteMapProps {
   visitRoute?: { customerId: string; order: number }[];
   onCustomerClick?: (customer: Customer) => void;
 }
+
+// Create a client-side only wrapper component
+const ClientSideOnlyRouteMap = ({ children }: { children: React.ReactNode }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  if (!isMounted) {
+    return <div style={{ height: '500px', width: '100%', background: '#f0f2f5', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading map...</div>;
+  }
+  
+  return <>{children}</>;
+};
 
 const RouteMap: React.FC<RouteMapProps> = ({
   representatives,
@@ -150,64 +167,91 @@ const RouteMap: React.FC<RouteMapProps> = ({
   }
 
   return (
-    <div style={{ height: '500px', width: '100%', position: 'relative' }}>
-      <MapContainer
-        style={{ height: '100%', width: '100%', borderRadius: '8px' }}
-        center={center}
-        zoom={10}
-        scrollWheelZoom={true}
-        maxZoom={18}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    <ClientSideOnlyRouteMap>
+      <div style={{ height: '500px', width: '100%', position: 'relative' }}>
+        <MapContainer
+          style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+          center={center}
+          zoom={10}
+          scrollWheelZoom={true}
           maxZoom={18}
-        />
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            maxZoom={18}
+          />
 
-        <MapUpdater center={center} />
+          <MapUpdater center={center} />
 
-        {/* Representatives markers */}
-        {representatives.map(rep => (
-          <Marker
-            key={rep.id}
-            position={[
-              rep.currentLocation?.lat || 30.0444,
-              rep.currentLocation?.lng || 31.2357,
-            ]}
-            icon={representativeIcon}
-          >
-            <Popup>
-              <Card size="small" style={{ width: 200, border: 'none', padding: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar src={rep.photoUrl} icon={<UserOutlined />} />
-                  <div style={{ marginRight: 8 }}>
-                    <div><strong>{rep.name}</strong></div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {rep.phone}
-                    </Text>
+          {/* Representatives markers */}
+          {representatives.map(rep => (
+            <Marker
+              key={rep.id}
+              position={[
+                rep.currentLocation?.lat || 30.0444,
+                rep.currentLocation?.lng || 31.2357,
+              ]}
+              icon={representativeIcon}
+            >
+              <Popup>
+                <Card size="small" style={{ width: 200, border: 'none', padding: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar src={rep.photoUrl} icon={<UserOutlined />} />
+                    <div style={{ marginRight: 8 }}>
+                      <div><strong>{rep.name}</strong></div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {rep.phone}
+                      </Text>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Popup>
-          </Marker>
-        ))}
+                </Card>
+              </Popup>
+            </Marker>
+          ))}
 
-        {/* Customers markers */}
-        {customers
-          .filter(customer => customer.location)
-          .filter(customer => !routeCustomers.some(rc => rc.id === customer.id))
-          .map(customer => (
+          {/* Customers markers */}
+          {customers
+            .filter(customer => customer.location)
+            .filter(customer => !routeCustomers.some(rc => rc.id === customer.id))
+            .map(customer => (
+              <Marker
+                key={customer.id}
+                position={[customer.location!.lat, customer.location!.lng]}
+                icon={customerIcon}
+                eventHandlers={{
+                  click: () => onCustomerClick && onCustomerClick(customer),
+                }}
+              >
+                <Popup>
+                  <Card size="small" style={{ width: 200, border: 'none', padding: 0 }}>
+                    <Title level={5}>{customer.name}</Title>
+                    <Text style={{ display: 'block' }}>{customer.phone}</Text>
+                    <Text type="secondary" style={{ display: 'block' }}>{customer.address}</Text>
+                    <Text style={{ display: 'block' }}>
+                      حد الائتمان: <Tag color="blue">{customer.creditLimit} ج.م</Tag>
+                    </Text>
+                  </Card>
+                </Popup>
+              </Marker>
+            ))}
+
+          {/* Route customers markers with order numbers */}
+          {routeCustomers.map(customer => (
             <Marker
               key={customer.id}
               position={[customer.location!.lat, customer.location!.lng]}
-              icon={customerIcon}
+              icon={routeCustomerIcon}
               eventHandlers={{
                 click: () => onCustomerClick && onCustomerClick(customer),
               }}
             >
               <Popup>
                 <Card size="small" style={{ width: 200, border: 'none', padding: 0 }}>
-                  <Title level={5}>{customer.name}</Title>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Title level={5}>{customer.name}</Title>
+                    <Tag color="orange">#{customer.order}</Tag>
+                  </div>
                   <Text style={{ display: 'block' }}>{customer.phone}</Text>
                   <Text type="secondary" style={{ display: 'block' }}>{customer.address}</Text>
                   <Text style={{ display: 'block' }}>
@@ -218,44 +262,19 @@ const RouteMap: React.FC<RouteMapProps> = ({
             </Marker>
           ))}
 
-        {/* Route customers markers with order numbers */}
-        {routeCustomers.map((customer, index) => (
-          <Marker
-            key={customer.id}
-            position={[customer.location!.lat, customer.location!.lng]}
-            icon={routeCustomerIcon}
-            eventHandlers={{
-              click: () => onCustomerClick && onCustomerClick(customer),
-            }}
-          >
-            <Popup>
-              <Card size="small" style={{ width: 200, border: 'none', padding: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Title level={5}>{customer.name}</Title>
-                  <Tag color="orange">#{customer.order}</Tag>
-                </div>
-                <Text style={{ display: 'block' }}>{customer.phone}</Text>
-                <Text type="secondary" style={{ display: 'block' }}>{customer.address}</Text>
-                <Text style={{ display: 'block' }}>
-                  حد الائتمان: <Tag color="blue">{customer.creditLimit} ج.م</Tag>
-                </Text>
-              </Card>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Route polyline */}
-        {routeCoordinates.length > 1 && (
-          <Polyline
-            positions={routeCoordinates}
-            color="blue"
-            weight={3}
-            opacity={0.7}
-          />
-        )}
-      </MapContainer>
-    </div>
+          {/* Route polyline */}
+          {routeCoordinates.length > 1 && (
+            <Polyline
+              positions={routeCoordinates}
+              color="blue"
+              weight={3}
+              opacity={0.7}
+            />
+          )}
+        </MapContainer>
+      </div>
+    </ClientSideOnlyRouteMap>
   );
 };
 
-export default RouteMap; 
+export default dynamic(() => Promise.resolve(RouteMap), { ssr: false }); 

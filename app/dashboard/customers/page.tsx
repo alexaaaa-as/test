@@ -27,33 +27,45 @@ import { useStore } from '../../../lib/store';
 import type { Customer, CustomerPurchaseHistory, Representative, Invoice } from '../../../types';
 import { formatCurrency, formatDate, generateId } from '../../../utils/helpers';
 import RouteMap from '../../../components/common/RouteMap';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Tooltip,
-  Legend,
-  ArcElement,
-} from 'chart.js';
-import { Line, Bar, Pie } from 'react-chartjs-2';
+import dynamic from 'next/dynamic';
 import type { ColumnType } from 'antd/es/table';
 import type { TableProps } from 'antd';
 import TabPane from 'antd/es/tabs/TabPane';
 
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Tooltip,
-  Legend,
-  ArcElement
-);
+// Client-side only chart registration
+const registerCharts = () => {
+  if (typeof window !== 'undefined') {
+    import('chart.js').then((ChartModule) => {
+      const {
+        Chart,
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        BarElement,
+        Tooltip,
+        Legend,
+        ArcElement,
+      } = ChartModule;
+
+      Chart.register(
+        CategoryScale,
+        LinearScale,
+        PointElement,
+        LineElement,
+        BarElement,
+        Tooltip,
+        Legend,
+        ArcElement
+      );
+    });
+  }
+};
+
+// Dynamically import chart components with SSR disabled
+const Line = dynamic(() => import('react-chartjs-2').then(mod => mod.Line), { ssr: false });
+const Bar = dynamic(() => import('react-chartjs-2').then(mod => mod.Bar), { ssr: false });
+const Pie = dynamic(() => import('react-chartjs-2').then(mod => mod.Pie), { ssr: false });
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -340,6 +352,11 @@ export default function CustomersPage() {
   const [totalPurchases, setTotalPurchases] = useState(0);
   const [customerPurchasesByMonth, setCustomerPurchasesByMonth] = useState<any[]>([]);
 
+  // Register Chart.js on client side
+  useEffect(() => {
+    registerCharts();
+  }, []);
+  
   // Calculate customer's balance function
   const calculateBalance = (customerId: string): number => {
     const customerInvs = invoices.filter(inv => inv.customerId === customerId);
