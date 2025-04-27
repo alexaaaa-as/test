@@ -230,6 +230,12 @@ export default function InvoicesPage() {
   };
 
   const handlePrint = (invoice: Invoice) => {
+    // التحقق من بيئة العميل قبل استخدام window
+    if (typeof window === 'undefined') {
+      console.warn('Cannot print in server environment');
+      return;
+    }
+    
     // Open print window with invoice details
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
