@@ -115,11 +115,6 @@ export default function RepresentativesPage() {
     }
   }, [representatives.length, setRepresentatives]);
 
-  // Register Chart.js on client side
-  useEffect(() => {
-    registerCharts();
-  }, []);
-
   const showModal = (representative?: Representative) => {
     setEditingRepresentative(representative || null);
     if (representative) {
